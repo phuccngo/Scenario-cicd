@@ -29,6 +29,12 @@ pipeline {
             steps {
                 dir('scenario') {
                     sh '''
+                        apt-get update
+                        apt-get install -y --no-install-recommends \
+                            gcc \
+                            libpq-dev \
+                            python3-dev
+
                         python --version
                         python -m pip install --upgrade pip
 
