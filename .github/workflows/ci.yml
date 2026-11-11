@@ -66,13 +66,35 @@ jobs:
         run: |
           python -m pip install -r requirements-test.txt
 
-      # 7. Validate Python syntax
+      # 7. Validate installed dependencies
+      - name: Check dependency consistency
+        run: |
+          python -m pip check
+
+      # 8. Validate Python syntax
       - name: Compile Python source
         working-directory: scenario
         run: |
           python -m compileall -q .
 
-      # 8. Run backend tests
-      - name: Run backend tests
+      # 9. Run backend unit tests and measure coverage
+      - name: Run backend unit tests
         run: |
-           python -m pytest -c config/pytest.ini tests/backend -v
+          python -m pytest \
+            -c config/pytest.ini \
+            tests/backend/unit \
+            -v \
+            --cov=anti_spam \
+            --cov=scenario_stage_rules \
+            --cov=scenario_queue \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml
+
+      # 10. Save coverage report
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: coverage.xml
+          if-no-files-found: ignore
