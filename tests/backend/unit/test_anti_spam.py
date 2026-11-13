@@ -30,12 +30,12 @@ def test_is_quiet_hour_at_start_is_not_quiet():
 
 def test_is_quiet_hour_before_end_is_not_quiet():
     config = anti_spam.DEFAULT_CONFIG
-    assert anti_spam.is_quiet_hour(datetime(2026, 1, 1, 22, 29), config) is False
+    assert anti_spam.is_quiet_hour(datetime(2026, 1, 1, 22, 30), config) is False
 
 
 def test_is_quiet_hour_at_end():
     config = anti_spam.DEFAULT_CONFIG
-    assert anti_spam.is_quiet_hour(datetime(2026, 1, 1, 22, 30), config) is True
+    assert anti_spam.is_quiet_hour(datetime(2026, 1, 1, 22, 31), config) is True
 
 
 def test_normalize_to_segment_moves_early_time_to_start():

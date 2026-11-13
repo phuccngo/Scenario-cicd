@@ -87,6 +87,9 @@ jobs:
             --cov=anti_spam \
             --cov=scenario_stage_rules \
             --cov=scenario_queue \
+            --cov=send_errors \
+            --cov=service_scenario_matcher \
+            --cov=send_dispatch \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml
 

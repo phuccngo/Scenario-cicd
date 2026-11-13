@@ -4,17 +4,34 @@ import pytest
 
 @pytest.fixture
 def dispatch_module(monkeypatch):
+    # Mock database module
     db = types.ModuleType("db")
     db.SessionLocal = Mock()
-    db.EventLog = type("EventLog", (), {"id": object(), "event_id": object()})
+    db.EventLog = type("EventLog", (), {
+        "id": object(),
+        "event_id": object()
+    })
     db.release_tx = Mock()
     monkeypatch.setitem(sys.modules, "db", db)
+
+    # Mock Redis
     redis = types.ModuleType("redis")
-    redis.Redis = type("Redis", (), {"from_url": staticmethod(lambda *a, **k: Mock())})
+    redis.Redis = type("Redis", (), {
+        "from_url": staticmethod(lambda *a, **k: Mock())
+    })
     monkeypatch.setitem(sys.modules, "redis", redis)
+
+    # Mock scheduler vì dispatch_scheduler import module này
+    # ngay cả khi thực hiện đường xử lý Celery.
+    scheduler = types.ModuleType("scheduler")
+    scheduler.run_scheduler = Mock(return_value={"success": True})
+    monkeypatch.setitem(sys.modules, "scheduler", scheduler)
+
     sys.modules.pop("send_dispatch", None)
     module = importlib.import_module("send_dispatch")
+
     yield module
+
     sys.modules.pop("send_dispatch", None)
 
 def test_partition_key_priority(dispatch_module):
