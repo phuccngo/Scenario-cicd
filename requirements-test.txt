@@ -2,3 +2,6 @@ pytest
 pytest-cov
 pytest-mock
 ruff
+bandit
+pip-audit
+psycopg2-binary
