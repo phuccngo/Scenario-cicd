@@ -16,11 +16,27 @@ permissions:
 
 jobs:
   test:
-    name: Backend Tests
+    name: Backend Tests, Security and PostgreSQL
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: scenario_test
+          POSTGRES_USER: scenario_test
+          POSTGRES_PASSWORD: scenario_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scenario_test -d scenario_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     env:
       PYTHONPATH: scenario
+      TEST_DATABASE_URL: postgresql://scenario_test:scenario_test@localhost:5432/scenario_test
 
     steps:
       # 1. Checkout CI/CD repository
@@ -60,8 +76,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      # 6. Install testing and quality dependencies
+      # 6. Install testing, security and database test dependencies
       - name: Install testing and quality dependencies
+        id: install-test-deps
         run: |
           python -m pip install -r requirements-test.txt
 
@@ -70,19 +87,13 @@ jobs:
         run: |
           python -m pip check
 
-      # 8. Check Python code quality and formatting (read-only)
-      - name: Run Ruff
-        run: |
-          ruff check scenario/
-          ruff format --check scenario/
-
-      # 9. Validate Python syntax
+      # 8. Validate Python syntax
       - name: Compile Python source
         working-directory: scenario
         run: |
           python -m compileall -q .
 
-      # 10. Run backend unit tests and enforce coverage threshold
+      # 9. Run backend unit tests and enforce coverage threshold
       - name: Run backend unit tests
         run: |
           python -m pytest \
@@ -99,7 +110,41 @@ jobs:
             --cov-report=xml:coverage.xml \
             --cov-fail-under=80
 
-      # 11. Save coverage report
+      # 10. Run PostgreSQL SQL integration smoke test.
+      # This step still runs if unit tests fail, so database diagnostics are not hidden.
+      - name: Run PostgreSQL integration tests
+        if: ${{ always() && steps.install-test-deps.outcome == 'success' }}
+        run: |
+          python -m pytest -c config/pytest.ini tests/backend/integration -v
+
+      # 11. Scan application source for common Python security issues
+      - name: Run Bandit security scan
+        if: ${{ always() && steps.install-test-deps.outcome == 'success' }}
+        run: |
+          bandit -r scenario/ -f json -o bandit-report.json
+
+      # 12. Audit application and CI test dependencies for known vulnerabilities
+      - name: Run pip-audit
+        if: ${{ always() && steps.install-test-deps.outcome == 'success' }}
+        run: |
+          pip-audit \
+            -r scenario/requirements.txt \
+            -r requirements-test.txt \
+            --format json \
+            --output pip-audit-report.json
+
+      # 13. Save security scan reports
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-reports
+          path: |
+            bandit-report.json
+            pip-audit-report.json
+          if-no-files-found: ignore
+
+      # 14. Save coverage report
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,3 +152,11 @@ jobs:
           name: backend-coverage-report
           path: coverage.xml
           if-no-files-found: ignore
+
+      # 15. Run Ruff last so its existing findings do not prevent the
+      # PostgreSQL and security checks above from executing.
+      - name: Run Ruff
+        if: ${{ always() && steps.install-test-deps.outcome == 'success' }}
+        run: |
+          ruff check scenario/
+          ruff format --check scenario/
